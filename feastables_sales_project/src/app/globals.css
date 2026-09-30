@@ -28,13 +28,20 @@
 /* --- Reset --- */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 
 body {
   background: var(--blue);
   color: var(--white);
   font-family: var(--font-body);
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* =============================================
@@ -124,7 +131,9 @@ body {
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  display: block;
+  /* Buffer size is set via JS at devicePixelRatio; CSS size stays 1× */
+  image-rendering: auto;
   mix-blend-mode: screen;
   opacity: 0.25;
 }
@@ -166,10 +175,12 @@ body {
 
 .hero-title {
   font-family: var(--font-display);
-  font-size: clamp(5rem, 15vw, 13rem);
+  font-size: clamp(3.25rem, 14vw, 13rem);
   line-height: 0.88;
   letter-spacing: -0.02em;
   color: var(--white);
+  max-width: 100%;
+  padding-inline: 0.5rem;
   text-shadow:
     6px 6px 0px var(--choco),
     0 0 80px rgba(255,255,255,0.2);
@@ -213,11 +224,14 @@ body {
 /* --- GROWTH OVERLAY --- */
 .growth-overlay {
   position: absolute;
-  left: 6vw;
-  max-width: 500px;
+  left: clamp(1rem, 6vw, 4rem);
+  right: clamp(1rem, 6vw, 4rem);
+  max-width: min(500px, 100%);
+  width: min(500px, calc(100% - 2rem));
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
+  padding-inline: 0.25rem;
 }
 
 .growth-tag {
@@ -328,6 +342,9 @@ body {
   align-items: center;
   text-align: center;
   gap: 2rem;
+  width: min(100%, 720px);
+  padding-inline: clamp(1rem, 4vw, 2rem);
+  box-sizing: border-box;
 }
 
 .decon-label {
@@ -341,11 +358,13 @@ body {
 
 .decon-title {
   font-family: var(--font-display);
-  font-size: clamp(3rem, 8vw, 6rem);
+  font-size: clamp(2.25rem, 8vw, 6rem);
   color: var(--white);
   line-height: 1;
   text-shadow: 5px 5px 0 var(--choco);
   letter-spacing: -0.02em;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .ingredients-wrap {
@@ -1067,8 +1086,25 @@ body {
   display: inline-block;
 }
 
-/* ── RESPONSIVE ── */
+/* ── RESPONSIVE: scrollytelling + dashboard ── */
 @media (max-width: 900px) {
+  .navbar {
+    padding: 1rem 1.25rem;
+  }
+  .nav-links { display: none; }
+  .hero-overlay {
+    padding-inline: 1rem;
+    max-width: 100%;
+  }
+  .growth-overlay {
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+    max-width: none;
+  }
+  .stat-num { font-size: clamp(1.6rem, 8vw, 2.2rem); }
+  .stat-num.target { font-size: clamp(2rem, 9vw, 2.8rem); }
+  .progress-track { display: none; }
   .db-panels { grid-template-columns: 1fr; }
   .db-region-kpis { grid-template-columns: repeat(2, 1fr); }
   .db-country-header-row,
@@ -1080,6 +1116,23 @@ body {
 }
 
 @media (max-width: 600px) {
+  .hero-title {
+    font-size: clamp(2.75rem, 16vw, 5rem);
+    text-shadow: 3px 3px 0 var(--choco), 0 0 40px rgba(255,255,255,0.2);
+  }
+  .hero-valuation-badge {
+    padding: 0.5rem 1.25rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .ingredients-wrap {
+    gap: 0.65rem;
+    max-width: 100%;
+  }
+  .ing-pill {
+    font-size: 0.75rem;
+    padding: 0.55rem 1.1rem;
+  }
   .db-main { padding: 1.5rem 1rem 3rem; }
   .db-header { padding: 1rem 1.25rem; }
   .db-kpis { grid-template-columns: repeat(2, 1fr); }

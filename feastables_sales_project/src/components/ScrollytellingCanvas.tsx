@@ -1,6 +1,6 @@
 'use client';
 import { useScroll, useTransform, motion, useSpring } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface SalesData {
   revenue_2024: string;
@@ -13,6 +13,7 @@ interface SalesData {
 export default function ScrollytellingCanvas({ salesData }: { salesData: SalesData }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sizeRef = useRef({ w: 0, h: 0, dpr: 1 });
   const [images, setImages] = useState<HTMLImageElement[]>([]);
   const [scrollPct, setScrollPct] = useState(0);
 
@@ -27,41 +28,100 @@ export default function ScrollytellingCanvas({ salesData }: { salesData: SalesDa
 
   const frameIndex = useTransform(smoothProgress, [0, 1], [0, 119]);
 
+  const setupCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width));
+    const h = Math.max(1, Math.round(rect.height));
+    sizeRef.current = { w, h, dpr };
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }, []);
+
+  const drawFrame = useCallback((idx: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { w, h, dpr } = sizeRef.current;
+    if (!w || !h) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    const img = images[idx];
+    if (img?.complete && img.naturalWidth > 0) {
+      // Cover-fit the frame into CSS pixel bounds
+      const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      const dx = (w - dw) / 2;
+      const dy = (h - dh) / 2;
+      ctx.drawImage(img, dx, dy, dw, dh);
+    }
+  }, [images]);
+
   useEffect(() => {
     return scrollYProgress.on('change', (v) => setScrollPct(Math.round(v * 100)));
   }, [scrollYProgress]);
 
   useEffect(() => {
     const preload = async () => {
-      const loaded: HTMLImageElement[] = [];
-      for (let i = 0; i < 120; i++) {
-        const img = new Image();
-        img.src = `/assets/frames/frame_${String(i).padStart(3, '0')}.webp`;
-        loaded.push(img);
-      }
+      const loaded = await Promise.all(
+        Array.from({ length: 120 }, (_, i) => {
+          return new Promise<HTMLImageElement>((resolve) => {
+            const img = new Image();
+            img.decoding = 'async';
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(img);
+            img.src = `/assets/frames/frame_${String(i).padStart(3, '0')}.webp`;
+          });
+        })
+      );
       setImages(loaded);
     };
     preload();
   }, []);
 
   useEffect(() => {
-    const render = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
+    setupCanvas();
+    const onResize = () => {
+      setupCanvas();
       const idx = Math.min(119, Math.max(0, Math.floor(frameIndex.get())));
-      if (ctx && images[idx]?.complete) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(images[idx], 0, 0, canvas.width, canvas.height);
-      }
+      drawFrame(idx);
     };
+    window.addEventListener('resize', onResize);
+    // Recalc after layout / orientation changes
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(onResize)
+      : null;
+    if (canvasRef.current && ro) ro.observe(canvasRef.current);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      ro?.disconnect();
+    };
+  }, [setupCanvas, drawFrame, frameIndex]);
+
+  useEffect(() => {
+    if (!images.length) return;
+    setupCanvas();
+    const render = () => {
+      const idx = Math.min(119, Math.max(0, Math.floor(frameIndex.get())));
+      drawFrame(idx);
+    };
+    render();
     return frameIndex.on('change', render);
-  }, [images, frameIndex]);
+  }, [images, frameIndex, setupCanvas, drawFrame]);
 
   return (
     <>
-      {/* Starburst background */}
-      <div className="starburst-bg" />
+      {/* Starburst background — CSS conic-gradient (vector-sharp at any DPI) */}
+      <div className="starburst-bg" aria-hidden="true" />
 
       {/* Navbar */}
       <nav className="navbar">
@@ -79,9 +139,8 @@ export default function ScrollytellingCanvas({ salesData }: { salesData: SalesDa
         <div className="scrolly-sticky">
           <canvas
             ref={canvasRef}
-            width={1920}
-            height={1080}
             className="scrolly-canvas"
+            aria-hidden="true"
           />
           <Overlays progress={smoothProgress} data={salesData} />
         </div>
